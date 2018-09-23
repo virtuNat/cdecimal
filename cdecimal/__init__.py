@@ -1,4 +1,10 @@
-from .cdecimal import CDecimal, is_close, DivisionByZero, InvalidOperationError
+from .cdecimal import (
+    CDecimal, DivisionByZero, InvalidOperationError,
+    is_close, getcontext, setcontext, localcontext,
+    )
 from .constants import constants
 
-__all__ = ['CDecimal', 'is_close', 'DivisionByZero', 'InvalidOperationError']
+__all__ = [
+    'CDecimal', 'DivisionByZero', 'InvalidOperationError',
+    'is_close', 'getcontext', 'setcontext', 'localcontext',
+    ]
