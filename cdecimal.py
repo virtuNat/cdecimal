@@ -1,11 +1,14 @@
+"""Insert docstring here"""
 import decimal as dec
 import re
+
+import support
 
 getcontext = dec.getcontext
 setcontext = dec.setcontext
 localcontext = dec.localcontext
 
-def pi():
+def PI():
     """Returns the ratio of a circle's circumference to its diameter."""
     getcontext().prec += 2
     agm0 = agm1 = pow2 = dec.Decimal(1)
@@ -22,254 +25,16 @@ def pi():
             ave = (agm1 + agm2) / 2
             arc = ave * ave / denm
             getcontext().prec -= 2
-            return +arc
+            return CDecimal(+arc)
         pow2 *= 2
 
-def sin(ang):
-    """Returns the signed distance from the x axis of a point on the unit circle given
-    the angle in radians that it makes with the positive x axis with the origin as its
-    vertex.
-    """
-    # Note: Pretty fucking slow.
-    if not isinstance(ang, dec.Decimal):
-        ang = dec.Decimal(ang)
-    pi_val = pi()
-    pi_2 = pi_val / 2
-    context = getcontext()
-    context.prec += 2
-    # Clamp all equivalent angles to the interval [-2*pi, 2*pi]
-    # sin(x + 2*pi) = sin(x)
-    ang = ang % (2 * pi_val)
-    # Clamp all equivalent angles to the interval [0, 2*pi]
-    # sin(x + 2*pi) = sin(x)
-    if ang < 0:
-        ang = pi_val.fma(2, ang)
-    # Clamp all equivalent angles to the interval [-pi/2, pi/2]
-    # sin(pi - x) = sin(x)
-    if pi_2 < ang < 3 * pi_2:
-        ang = pi_val - ang
-    # sin(-x) = -sin(x)
-    sgn = dec.Decimal(1).copy_sign(ang)
-    ang = abs(ang)
-    # Calculates sine using the taylor series expansion at 0
-    ctr = 5
-    val = -ang * ang * ang / 6
-    total = ang + val
-    while True:
-        val = -val * ang * ang / ctr / (ctr - 1)
-        if val == 0 or val.logb() < total.logb() - context.prec:
-            context.prec -= 2
-            if total == 0 or abs(total).logb() < -context.prec:
-                return sgn * dec.Decimal(0)
-            return sgn * total
-        total += val
-        ctr += 2
+def E():
+    """Returns the base of the natural logarithm."""
+    return CDecimal(1).exp()
 
-def cos(ang):
-    """Returns the signed distance from the y axis of a point on the unit circle given
-    the angle in radians that it makes with the positive x axis with the origin as its
-    vertex.
-    """
-    # Note: Pretty fucking slow.
-    if not isinstance(ang, dec.Decimal):
-        ang = dec.Decimal(ang)
-    pi_val = pi()
-    pi_2 = pi_val / 2
-    context = getcontext()
-    context.prec += 2
-    # Clamp all equivalent angles to the interval [-2*pi, 2*pi]
-    # cos(x + 2*pi) = cos(x)
-    ang = ang % (2 * pi_val)
-    # Clamp all equivalent angles to the interval [0, 2*pi]
-    # cos(x + 2*pi) = cos(x)
-    if ang < 0:
-        ang = pi_val.fma(2, ang)
-    # Clamp all equivalent angles to the interval [0, pi]
-    # cos(2*pi - x) = cos(x)
-    if ang > pi_val:
-        ang = pi_val.fma(2, -ang)
-    # cos(pi - x) = -cos(x)
-    if ang > pi_2:
-        sgn = -1 
-        ang = pi_val - ang
-    elif ang < pi_2:
-        sgn = 1
-    else:
-        return dec.Decimal(0)
-    # Calculates cosine using the taylor series expansion at 0
-    ctr = 4
-    val = -ang * ang / 2
-    total = 1 + val
-    while True:
-        val = -val * ang * ang / ctr / (ctr - 1)
-        if val == 0 or val.logb() < total.logb() - context.prec:
-            context.prec -= 2
-            if total == 0 or abs(total).logb() < -context.prec:
-                return sgn * dec.Decimal(0)
-            return sgn * total
-        total += val
-        ctr += 2
-
-def atan_half():
-    """Returns atan(0.5)."""
-    context = getcontext()
-    context.prec += 2
-    prec = dec.Decimal('1E-'+str(context.prec))
-    val = dec.Decimal(0.5)
-    num1 = 1
-    num2 = val * val
-    den1 = 3
-    den2 = 1 + num2
-    term = val / den2
-    total = term
-    while True:
-        prev = term
-        term = term * 4 * num1 * num1 * num2 / den1 / (den1 - 1) / den2
-        if term == 0 or term.logb() < total.logb() - context.prec:
-            context.prec -= 2
-            return +total
-        total += term
-        num1 += 1
-        den1 += 2
-
-def atan(val):
-    """Returns the principal angle in radians for which, on the unit circle,
-    a point whose ray casted from the origin makes that angle with respect
-    to the positive x axis forms a right triangle with respect to the coordinate
-    axes such that the ratio of the length of the leg parallel to the y axis
-    to the length of the leg along the x axis is the given value.
-    """
-    if not isinstance(val, dec.Decimal):
-        val = dec.Decimal(val)
-    # atan(-x) = -atan(x)
-    sgn = dec.Decimal(1).copy_sign(val)
-    val = abs(val)
-    pi_val = pi()
-    context = getcontext()
-    context.prec += 2
-    if val == dec.Decimal('Infinity'):
-        ans = (pi_val / 2).copy_sign(sgn)
-        context.prec -= 2
-        return +ans
-    # atan(x) = pi/2 - atan(1/x)
-    if val > 1:
-        off = pi_val / 2
-        val = 1 / val
-    else:
-        off = 0
-    # atan(x) = atan(y) + atan((x - y) / (1 + x*y))
-    if val > 0.5:
-        at_hlf = atan_half()
-        val = (val - dec.Decimal(0.5)) / (1 + val/2)
-    else:
-        at_hlf = 0
-    num1 = 1
-    num2 = val * val
-    den1 = 3
-    den2 = 1 + num2
-    term = val / den2
-    total = term
-    while True:
-        term *= 4 * num1 * num1 * num2 / den1 / (den1 - 1) / den2
-        if term == 0 or term.logb() < total.logb() - context.prec:
-            if total == 0 or abs(total).logb() < -context.prec:
-                context.prec -= 2
-                return sgn * dec.Decimal(0)
-            total += at_hlf
-            if off != 0:
-                total = off - total 
-            context.prec -= 2
-            return +(sgn * total)
-        total += term
-        num1 += 1
-        den1 += 2
-
-def atan2(y, x):
-    """Returns the principal angle in radians that a given point on the cartesian
-    plane makes with respect to the positive x axis with the origin as the vertex.
-    """
-    if x == 0:
-        if y == 0:
-            raise InvalidOperationError('2-arg inverse tangent not defined at the origin')
-        return pi().copy_sign(dec.Decimal(y)) / 2
-    elif y == 0:
-        return pi() if x < 0 else dec.Decimal(0)
-    getcontext().prec += 2
-    arg = dec.Decimal(y) / dec.Decimal(x)
-    if arg != 1:
-        if x < 0:
-            val = atan(arg) - pi().copy_sign(arg)
-        else:
-            val = atan(arg)
-    else:
-        if x < 0:
-            val = -3 * pi().copy_sign(arg) / 4
-        else:
-            val = pi().copy_sign(arg) / 4
-    getcontext().prec -= 2
-    return +val
-
-def sinh(ang):
-    """Returns the signed distance from the x axis of a point on the unit hyperbola given
-    the hyperbolic angle in radians that it makes with the positive x axis with the origin
-    as its vertex.
-    """
-    if not isinstance(ang, dec.Decimal):
-        ang = dec.Decimal(ang)
-    context = getcontext()
-    context.prec += 2
-    num = ang * ang
-    den = 5
-    term = ang * num / 6
-    total = ang + term
-    while True:
-        prev = dec.Decimal(term)
-        term *= num / den / (den - 1)
-        if term == 0 or term.logb() < total.logb() - context.prec:
-            context.prec -= 2
-            return +total
-        total += term
-        den += 2
-
-def cosh(ang):
-    """Returns the absolute distance from the y axis of a point on the unit hyperbola given
-    the hyperbolic angle in radians that it makes with the positive x axis with the origin
-    as its vertex.
-    """
-    if not isinstance(ang, dec.Decimal):
-        ang = dec.Decimal(ang)
-    context = getcontext()
-    context.prec += 2
-    num = ang * ang
-    den = 4
-    term = num / 2
-    total = 1 + term
-    while True:
-        prev = dec.Decimal(term)
-        term *= num / den / (den - 1)
-        if term == 0 or term.logb() < total.logb() - context.prec:
-            context.prec -= 2
-            return +total
-        total += term
-        den += 2
-
-def cbrt(num):
-    """Returns the principal number for which, when multiplied to itself twice
-    would have a value equal to the argument.
-    """
-    if not isinstance(num, dec.Decimal):
-        num = dec.Decimal(num)
-    if num == 0:
-        return dec.Decimal(0)
-    context = getcontext()
-    context.prec += 2
-    x = num / 3
-    while True:
-        p = x
-        x = (2*x + num/x/x) / 3
-        if p == x:
-            context.prec -= 2
-            return x
+def I():
+    """Returns the imaginary unit."""
+    return CDecimal(0, 1)
 
 def is_close(num1, num2, prec=dec.Decimal('1E-9')):
     """Returns True if two numbers are sufficiently close to each other in value,
@@ -304,33 +69,6 @@ class CDecimal(object):
     is given, returns CDecimal('0', '0').
     """
     __slots__ = ('_real', '_imag')
-    imag_regex = re.compile(
-        r"""
-        (
-            [-+]? # Sign is optional
-            (?:   # Manitssa
-                \d+          # Integer part: 345
-                (?:\.\d*)?   # Decimal part after integer: 345.123
-                |\.\d+       # Integer part optional: .123
-            )
-            (?:   # Exponent is optional
-                [eE][-+]?\d+ # 1E-7
-            )?
-        )[jJ]     # Signifies this is an imaginary number
-        """,
-        re.VERBOSE
-        )
-    cplx_regex = re.compile(
-        r"""
-        (   # Real part, sign is optional
-            [-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?
-        )
-        (   # Imaginary part, sign is mandatory
-            [-+](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?
-        )[jJ]
-        """,
-        re.VERBOSE
-        )
 
     def __init__(self, real='0', imag='0', context=None):
         self.real = dec.Decimal(real, context)
@@ -343,10 +81,10 @@ class CDecimal(object):
         default value as the __init__ constructor.
         """
         value = value.strip()
-        match = cls.imag_regex.match(value)
+        match = support.imag_regex.match(value)
         if match:
             return cls(0, match[1], context)
-        match = cls.cplx_regex.match(value)
+        match = support.cplx_regex.match(value)
         if match:
             return cls(match[1], match[2], context)
         raise ValueError('CDecimal.from_string argument is a malformed string')
@@ -360,7 +98,7 @@ class CDecimal(object):
         """
         mod = dec.Decimal(mod)
         arg = dec.Decimal(arg)
-        return cls(mod * cos(arg), mod * sin(arg), context)
+        return cls(mod * support.cos(arg), mod * support.sin(arg), context)
 
     def __getattr__(self, name):
         if name == 'real':
@@ -656,7 +394,7 @@ class CDecimal(object):
                         )
                 arg = 0
             else:
-                arg = atan2(self._imag, self._real) * value
+                arg = support.atan2(self._imag, self._real) * value
             ans = self.__class__.from_polar(mod ** value, arg)
             getcontext().prec -= 2
             return +ans
@@ -718,9 +456,9 @@ class CDecimal(object):
                         )
                 arg = 0
             else:
-                arg = atan2(self._imag, self._real) * value
-            x = mod * cos(arg)
-            y = mod * sin(arg)
+                arg = support.atan2(self._imag, self._real) * value
+            x = mod * support.cos(arg)
+            y = mod * support.sin(arg)
             getcontext().prec -= 2
             self._real = +x
             self._imag = +y
@@ -733,8 +471,8 @@ class CDecimal(object):
             log_val = self.ln() * value
             mod = log_val.real.exp()
             arg = log_val.imag
-            x = mod * cos(arg)
-            y = mod * sin(arg)
+            x = mod * support.cos(arg)
+            y = mod * support.sin(arg)
             getcontext().prec -= 2
             self._real = +x
             self._imag = +y
@@ -779,7 +517,7 @@ class CDecimal(object):
             raise InvalidOperationError(
                 'argument of a complex number is not defined at 0'
                 )
-        return atan2(self._imag, self._real)
+        return support.atan2(self._imag, self._real)
 
     def copy_abs(self):
         """Returns the absolute distance of the complex number from zero."""
@@ -819,7 +557,7 @@ class CDecimal(object):
         elif isinstance(other, self.__class__):
             try:
                 arg = other.arg()
-            except InvalidOperationError:
+            except ValueError:
                 arg = 0
             return self.__class__.from_polar(abs(self), arg)
 
@@ -882,8 +620,8 @@ class CDecimal(object):
         getcontext().prec += 2
         mod = abs(self).sqrt()
         try:
-            arg = atan2(self._imag, self._real) / 2
-        except InvalidOperationError:
+            arg = support.atan2(self._imag, self._real) / 2
+        except ValueError:
             arg = 0
         val = self.__class__.from_polar(mod, arg)
         getcontext().prec -= 2
@@ -894,8 +632,8 @@ class CDecimal(object):
         getcontext().prec += 2
         mod = abs(self).sqrt()
         try:
-            arg = atan2(self._imag, self._real) / 2
-        except InvalidOperationError:
+            arg = support.atan2(self._imag, self._real) / 2
+        except ValueError:
             arg = 0
         val = self.__class__.from_polar(mod, arg)
         getcontext().prec -= 2
@@ -905,10 +643,10 @@ class CDecimal(object):
         """Returns the three cube roots of the operand."""
         getcontext().prec += 2
         off = self.__class__(-0.5, dec.Decimal(0.75).sqrt()) # (-0.5+0.866j)
-        mod = cbrt(abs(self))
+        mod = support.cbrt(abs(self))
         try:
-            arg = atan2(self._imag, self._real) / 3
-        except InvalidOperationError:
+            arg = support.atan2(self._imag, self._real) / 3
+        except ValueError:
             arg = 0
         rt1 = self.__class__.from_polar(mod, arg)
         rt2 = rt1 * off
@@ -919,10 +657,10 @@ class CDecimal(object):
     def cbrt1(self):
         """Returns the principal cube root of the operand."""
         getcontext().prec += 2
-        mod = cbrt(abs(self))
+        mod = support.cbrt(abs(self))
         try:
-            arg = atan2(self._imag, self._real) / 3
-        except InvalidOperationError:
+            arg = support.atan2(self._imag, self._real) / 3
+        except ValueError:
             arg = 0
         val = self.__class__.from_polar(mod, arg)
         getcontext().prec -= 2
@@ -949,15 +687,15 @@ class CDecimal(object):
         elif index == 2:
             mod = abs(self).sqrt()
         elif index == 3:
-            mod = abs(self).cbrt()
+            mod = support.cbrt(abs(self))
         else:
             mod = abs(self) ** (dec.Decimal(1) / index)
         try:
-            arg = atan2(self._imag, self._real) / index
-        except InvalidOperationError:
+            arg = support.atan2(self._imag, self._real) / index
+        except ValueError:
             arg = 0
         val = self.__class__.from_polar(mod, arg)
-        off = self.__class__.from_polar(1, 2 * pi() / index)
+        off = self.__class__.from_polar(1, 2 * support.pi() / index)
         tmp = val
         lst = [val]
         for _ in range(index - 1):
@@ -969,8 +707,8 @@ class CDecimal(object):
         """Returns the value of e raised to the power of the operand."""
         mod = abs(self).exp()
         try:
-            arg = atan2(self._imag, self._real)
-        except InvalidOperationError:
+            arg = support.atan2(self._imag, self._real)
+        except ValueError:
             arg = 0
         return self.__class__.from_polar(mod, arg)
 
@@ -981,7 +719,7 @@ class CDecimal(object):
             raise InvalidOperationError('logarithm is not defined at 0')
         rad = 0 if mod == 1 else mod.ln()
         return self.__class__(
-            rad, atan2(self._imag, self._real)
+            rad, support.atan2(self._imag, self._real)
             )
 
     def log10(self):
@@ -992,7 +730,7 @@ class CDecimal(object):
             raise InvalidOperationError('logarithm is not defined at 0')
         rad = 0 if mod == 1 else mod.log10()
         return self.__class__(
-            rad, atan2(self._imag, self._real) / base
+            rad, support.atan2(self._imag, self._real) / base
             )
 
     def log_base(self, base):
@@ -1009,14 +747,14 @@ class CDecimal(object):
             raise InvalidOperationError('logarithm is not defined at 0')
         elif mod == 1:
             return self.__class__(0, 0)
-        return self.__class__(mod.ln(), atan2(self._imag, self._real)) / base.ln()
+        return self.__class__(mod.ln(), support.atan2(self._imag, self._real)) / base.ln()
 
     # Trigonometric functions
     def sin(self):
         """Returns the complex sine of self."""
         getcontext().prec += 2
-        re = sin(self._real) * cosh(self._imag)
-        im = cos(self._real) * sinh(self._imag)
+        re = support.sin(self._real) * support.cosh(self._imag)
+        im = support.cos(self._real) * support.sinh(self._imag)
         ans = self.__class__(re, im)
         getcontext().prec -= 2
         return +ans
@@ -1024,8 +762,8 @@ class CDecimal(object):
     def cos(self):
         """Returns the complex cosine of self."""
         getcontext().prec += 2
-        re = cos(self._real) * cosh(self._imag)
-        im = sin(self._real) * sinh(self._imag)
+        re = support.cos(self._real) * support.cosh(self._imag)
+        im = support.sin(self._real) * support.sinh(self._imag)
         ans = self.__class__(re, -im)
         getcontext().prec -= 2
         return +ans
@@ -1035,8 +773,8 @@ class CDecimal(object):
         getcontext().prec += 2
         re2 = 2 * self._real
         im2 = 2 * self._imag
-        den = cos(re2) + cosh(im2)
-        ans = self.__class__(sin(re2) / den, sinh(im2) / den)
+        den = support.cos(re2) + support.cosh(im2)
+        ans = self.__class__(support.sin(re2) / den, support.sinh(im2) / den)
         getcontext().prec -= 2
         return +ans
 
@@ -1070,8 +808,8 @@ class CDecimal(object):
     def sinh(self):
         """Returns the complex hyperbolic sine of self."""
         getcontext().prec += 2
-        re = sinh(self._real) * cos(self._imag)
-        im = cosh(self._real) * sin(self._imag)
+        re = support.sinh(self._real) * support.cos(self._imag)
+        im = support.cosh(self._real) * support.sin(self._imag)
         ans = self.__class__(re, im)
         getcontext().prec -= 2
         return +ans
@@ -1079,8 +817,8 @@ class CDecimal(object):
     def cosh(self):
         """Returns the complex hyperbolic cosine of self."""
         getcontext().prec += 2
-        re = cosh(self._real) * cos(self._imag)
-        im = sinh(self._real) * sin(self._imag)
+        re = support.cosh(self._real) * support.cos(self._imag)
+        im = support.sinh(self._real) * support.sin(self._imag)
         ans = self.__class__(re, im)
         getcontext().prec -= 2
         return +ans
@@ -1090,8 +828,8 @@ class CDecimal(object):
         getcontext().prec += 2
         re2 = 2 * self._real
         im2 = 2 * self._imag
-        den = cosh(re2) + cos(im2)
-        ans = self.__class__(sinh(re2) / den, sin(im2) / den)
+        den = support.cosh(re2) + support.cos(im2)
+        ans = self.__class__(support.sinh(re2) / den, support.sin(im2) / den)
         getcontext().prec -= 2
         return +ans
 
@@ -1150,5 +888,3 @@ class CDecimal(object):
     def radix(self):
         """Returns the radix of mathematical operation."""
         return self.__class__(10, 0)
-
-IMAG_UNIT = CDecimal(0, 1)
