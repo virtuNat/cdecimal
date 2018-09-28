@@ -1,5 +1,5 @@
 import decimal as dec
-from .. import CDecimal
+from . import CDecimal
 
 getcontext = dec.getcontext
 

@@ -172,11 +172,13 @@ class CDecimal(object):
         elif isinstance(value, self.__class__):
             self._real += value._real
             self._imag += value._imag
-        raise TypeError(
-            'unsupported operand type(s) for +: {!r} and {!r}'.format(
-                self.__class__.__name__, value.__class__.__name__
+        else:
+            raise TypeError(
+                'unsupported operand type(s) for +: {!r} and {!r}'.format(
+                    self.__class__.__name__, value.__class__.__name__
+                    )
                 )
-            )
+        return self
 
     def __sub__(self, value):
         """Return self - value."""
@@ -209,11 +211,13 @@ class CDecimal(object):
         elif isinstance(value, self.__class__):
             self._real -= value._real
             self._imag -= value._imag
-        raise TypeError(
-            'unsupported operand type(s) for -: {!r} and {!r}'.format(
-                self.__class__.__name__, value.__class__.__name__
+        else:
+            raise TypeError(
+                'unsupported operand type(s) for -: {!r} and {!r}'.format(
+                    self.__class__.__name__, value.__class__.__name__
+                    )
                 )
-            )
+        return self
 
     def __mul__(self, value):
         """Return self * value."""
@@ -258,11 +262,13 @@ class CDecimal(object):
             i = self._real.fma(value._imag, self._imag*value._real)
             self._real = r
             self._imag = i
-        raise TypeError(
-            'unsupported operand type(s) for *: {!r} and {!r}'.format(
-                self.__class__.__name__, value.__class__.__name__
+        else:
+            raise TypeError(
+                'unsupported operand type(s) for *: {!r} and {!r}'.format(
+                    self.__class__.__name__, value.__class__.__name__
+                    )
                 )
-            )
+        return self
 
     def __truediv__(self, value):
         """Return self / value."""
@@ -348,11 +354,13 @@ class CDecimal(object):
             qi = self._imag.fma(dr, -self._real*di) / hy
             self._real = qr
             self._imag = qi
-        raise TypeError(
-            'unsupported operand type(s) for /: {!r} and {!r}'.format(
-                self.__class__.__name__, value.__class__.__name__
+        else:
+            raise TypeError(
+                'unsupported operand type(s) for /: {!r} and {!r}'.format(
+                    self.__class__.__name__, value.__class__.__name__
+                    )
                 )
-            )
+        return self
 
     def __pow__(self, value):
         """Return self ** value."""
@@ -448,11 +456,13 @@ class CDecimal(object):
             getcontext().prec -= 2
             self._real = +x
             self._imag = +y
-        raise TypeError(
-            'unsupported operand type(s) for **: {!r} and {!r}'.format(
-                self.__class__.__name__, value.__class__.__name__
+        else:
+            raise TypeError(
+                'unsupported operand type(s) for **: {!r} and {!r}'.format(
+                    self.__class__.__name__, value.__class__.__name__
+                    )
                 )
-            )
+        return self
 
     def __floordiv__(self, value):
         raise TypeError('can\'t take the floor of a complex number')
