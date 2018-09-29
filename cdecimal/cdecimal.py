@@ -3,6 +3,7 @@ import decimal as dec
 import re
 
 from . import support
+from .errors import DivisionByZero, InvalidOperationError
 
 getcontext = dec.getcontext
 setcontext = dec.setcontext
@@ -25,14 +26,6 @@ def is_close(num1, num2, prec=dec.Decimal('1E-9')):
     if num2 == 0:
         return err < prec
     return 2 * err / (num1 + num2) < prec
-
-
-class DivisionByZero(ZeroDivisionError):
-    """Thrown when a division by zero occurs."""
-
-
-class InvalidOperationError(ArithmeticError):
-    """Thrown when an operation with an undefined value occurs."""
 
 
 class CDecimal(object):
@@ -135,7 +128,7 @@ class CDecimal(object):
 
     def __abs__(self):
         """Returns the absolute distance of the complex number from zero."""
-        return (self._real.fma(self._real, self._imag*self._imag)).sqrt()
+        return (self._real*self._real + self._imag*self._imag).sqrt()
 
     def __invert__(self):
         """Returns the complex conjugate of the number."""
@@ -226,8 +219,8 @@ class CDecimal(object):
         elif isinstance(value, self.__class__):
             # (a + bj)*(c + dj) = (ac - bd) + (ad + bc)*j
             return self.__class__(
-                self._real.fma(value._real, -self._imag*value._imag),
-                self._real.fma(value._imag, self._imag*value._real)
+                self._real*value._real - self._imag*value._imag,
+                self._real*value._imag + self._imag*value._real
                 )
         raise TypeError(
             'unsupported operand type(s) for *: {!r} and {!r}'.format(
@@ -242,8 +235,8 @@ class CDecimal(object):
         elif isinstance(value, self.__class__):
             # (a + bj)*(c + dj) = (ac - bd) + (ad + bc)*j
             return self.__class__(
-                value._real.fma(self._real, -value._imag*self._imag), 
-                value._imag.fma(self._real, value._real*self._imag)
+                value._real*self._real - value._imag*self._imag, 
+                value._imag*self._real + value._real*self._imag
                 )
         raise TypeError(
             'unsupported operand type(s) for *: {!r} and {!r}'.format(
@@ -258,8 +251,8 @@ class CDecimal(object):
             self._imag *= value
         elif isinstance(value, self.__class__):
             # (a + bj)*(c + dj) = (ac - bd) + (ad + bc)*j
-            r = self._real.fma(value._real, -self._imag*value._imag)
-            i = self._real.fma(value._imag, self._imag*value._real)
+            r = self._real*value._real - self._imag*value._imag
+            i = self._real*value._imag + self._imag*value._real
             self._real = r
             self._imag = i
         else:
@@ -284,15 +277,15 @@ class CDecimal(object):
             # (a + bj)/(c + dj) = ((ac + bd) + (bc - ad)*j) / (c*c + d*d)
             dr = value._real
             di = value._imag
-            hy = dr.fma(dr, di*di)
+            hy = dr*dr + di*di
             if hy == 0:
                 if self.is_zero():
                     raise InvalidOperationError(
                         'zero divided by zero is indeterminate'
                         )
                 raise DivisionByZero('division by zero')
-            qr = self._real.fma(dr, self._imag*di) / hy
-            qi = self._imag.fma(dr, -self._real*di) / hy
+            qr = (self._real*dr + self._imag*di) / hy
+            qi = (self._imag*dr - self._real*di) / hy
             return self.__class__(qr, qi)
         raise TypeError(
             'unsupported operand type(s) for /: {!r} and {!r}'.format(
@@ -317,15 +310,15 @@ class CDecimal(object):
         # (a + bj)/(c + dj) = ((ac + bd) + (bc - ad)*j) / (c*c + d*d)
         dr = self._real
         di = self._imag
-        hy = dr.fma(dr, di*di)
+        hy = dr*dr + di*di
         if hy == 0:
             if rr == 0 and ri == 0:
                 raise InvalidOperationError(
                     'zero divided by zero is indeterminate'
                     )
             raise DivisionByZero('division by zero')
-        qr = rr.fma(dr, ri*di) / hy
-        qi = ri.fma(dr, -rr*di) / hy
+        qr = (rr*dr + ri*di) / hy
+        qi = (ri*dr - rr*di) / hy
         return self.__class__(qr, qi)
 
     def __itruediv__(self, value):
@@ -343,15 +336,15 @@ class CDecimal(object):
             # (a + bj)/(c + dj) = ((ac + bd) + (bc - ad)*j) / (c*c + d*d)
             dr = value._real
             di = value._imag
-            hy = dr.fma(dr, di*di)
+            hy = dr*dr + di*di
             if hy == 0:
                 if self.is_zero():
                     raise InvalidOperationError(
                         'zero divided by zero is indeterminate'
                         )
                 raise DivisionByZero('division by zero')
-            qr = self._real.fma(dr, self._imag*di) / hy
-            qi = self._imag.fma(dr, -self._real*di) / hy
+            qr = (self._real*dr + self._imag*di) / hy
+            qi = (self._imag*dr - self._real*di) / hy
             self._real = qr
             self._imag = qi
         else:
@@ -503,7 +496,7 @@ class CDecimal(object):
 
     def copy_abs(self):
         """Returns the absolute distance of the complex number from zero."""
-        return (self._real.fma(self._real, self._imag*self._imag)).sqrt()
+        return (self._real*self._real + self._imag*self._imag).sqrt()
 
     def copy_negate(self):
         """Return -self"""
@@ -842,60 +835,60 @@ class CDecimal(object):
         analytic continuation of the factorial on all complex numbers.
         """
         context = getcontext()
-        err = dec.Decimal(context.prec).log() / (2*support.pi()).log()
-        acc = context.prec * err.to_integral_value(rounding=dec.ROUND_CEILING)
-        context.prec *= (err * err).to_integral_value(rounding=dec.ROUND_CEILING)
+        acc = (dec.Decimal(context.prec) * 3 / 2).__ceil__()
+        context.prec *= 2
         hlf = dec.Decimal(0.5)
         evl = dec.Decimal(1).exp()
-        # Uses Spouge approximation to calculate Pi(z), or Gamma(z + 1)
-        arg = self - 1
         # Offset the input to match the definition of the gamma function.
+        arg = self - 1
+        # Throw if input is a negative integer.
+        if arg.is_real() and arg.real % 1 == 0 and arg.real < 0:
+            context.prec //= 2
+            raise InvalidOperationError(
+                'gamma function not defined at negative integers or zero'
+                )
+        # Uses Spouge approximation to calculate Pi(z), or Gamma(z + 1)
         arz = arg + acc
         ans = arz ** (arg + hlf) * (-arz).exp()
-        cfk = (acc - 1).exp()
+        cfk = (acc - dec.Decimal(1)).exp()
         cft = (2 * support.pi()).sqrt() + (cfk * ((acc - 1) ** hlf))/(arg + 1)
         j = 1
-        for k in range(2, int(acc)):
+        for k in range(2, acc):
             cfk /= -j * evl
-            try:
-                cft += (cfk * ((acc - k) ** (k - hlf))) / (arg + k)
-            except DivisionByZero as exc:
-                context.prec //= 2
-                raise InvalidOperationError(
-                    'gamma function not defined at negative integers'
-                    ) from exc
+            cft += (cfk * ((acc - k) ** (k - hlf))) / (arg + k)
             j += 1
+        ans = ans * cft
         context.prec //= 2
-        return ans * cft
+        return +ans
 
     def gammap1(self):
         """Returns the gamma function, shifted so that it coincides with the
         values of the factorial on the positive integers.
         """
         context = getcontext()
-        err = dec.Decimal(context.prec).log() / (2*support.pi()).log()
-        acc = context.prec * err.to_integral_value(rounding=dec.ROUND_CEILING)
-        context.prec *= (err * err).to_integral_value(rounding=dec.ROUND_CEILING)
+        acc = (dec.Decimal(context.prec) * 3 / 2).__ceil__()
+        context.prec *= 2
         hlf = dec.Decimal(0.5)
         evl = dec.Decimal(1).exp()
+        # Throw if input is a negative integer.
+        if self.is_real() and self._real % 1 == 0 and self.real < 0:
+            context.prec //= 2
+            raise InvalidOperationError(
+                'pi function not defined at negative integers'
+                )
         # Uses Spouge approximation to calculate Pi(z), or Gamma(z + 1)
         arz = self + acc
         ans = arz ** (self + hlf) * (-arz).exp()
-        cfk = (acc - 1).exp()
+        cfk = (acc - dec.Decimal(1)).exp()
         cft = (2 * support.pi()).sqrt() + (cfk * ((acc - 1) ** hlf))/(self + 1)
         j = 1
-        for k in range(2, int(acc)):
+        for k in range(2, acc):
             cfk /= -j * evl
-            try:
-                cft += (cfk * ((acc - k) ** (k - hlf))) / (self + k)
-            except DivisionByZero as exc:
-                context.prec //= 2
-                raise InvalidOperationError(
-                    'gamma function not defined at negative integers'
-                    ) from exc
+            cft += (cfk * ((acc - k) ** (k - hlf))) / (self + k)
             j += 1
+        ans = ans * cft
         context.prec //= 2
-        return ans * cft
+        return +ans
 
     def zeta(self):
         """Returns the result of the riemann zeta function on self."""
