@@ -687,12 +687,7 @@ class CDecimal(object):
 
     def exp(self):
         """Returns the value of e raised to the power of the operand."""
-        mod = abs(self).exp()
-        try:
-            arg = support.atan2(self._imag, self._real)
-        except ValueError:
-            arg = 0
-        return self.__class__.from_polar(mod, arg)
+        return self.__class__.from_polar(self._real.exp(), self._imag)
 
     def ln(self):
         """Returns the natural logarithm of the operand."""
@@ -729,8 +724,10 @@ class CDecimal(object):
             raise InvalidOperationError('logarithm is not defined at 0')
         elif mod == 1:
             return self.__class__(0, 0)
-        return self.__class__(mod.ln(), support.atan2(self._imag, self._real)) / base.ln()
-
+        return (
+            self.__class__(mod.ln(), support.atan2(self._imag, self._real))
+            / base.ln()
+            )
     # Trigonometric functions
     def sin(self):
         """Returns the complex sine of self."""
@@ -844,7 +841,61 @@ class CDecimal(object):
         """Returns the result of the gamma function on self, which is the
         analytic continuation of the factorial on all complex numbers.
         """
-        raise NotImplementedError('not implemented yet, will use spouge approximation')
+        context = getcontext()
+        err = dec.Decimal(context.prec).log() / (2*support.pi()).log()
+        acc = context.prec * err.to_integral_value(rounding=dec.ROUND_CEILING)
+        context.prec *= (err * err).to_integral_value(rounding=dec.ROUND_CEILING)
+        hlf = dec.Decimal(0.5)
+        evl = dec.Decimal(1).exp()
+        # Uses Spouge approximation to calculate Pi(z), or Gamma(z + 1)
+        arg = self - 1
+        # Offset the input to match the definition of the gamma function.
+        arz = arg + acc
+        ans = arz ** (arg + hlf) * (-arz).exp()
+        cfk = (acc - 1).exp()
+        cft = (2 * support.pi()).sqrt() + (cfk * ((acc - 1) ** hlf))/(arg + 1)
+        j = 1
+        for k in range(2, int(acc)):
+            cfk /= -j * evl
+            try:
+                cft += (cfk * ((acc - k) ** (k - hlf))) / (arg + k)
+            except DivisionByZero as exc:
+                context.prec //= 2
+                raise InvalidOperationError(
+                    'gamma function not defined at negative integers'
+                    ) from exc
+            j += 1
+        context.prec //= 2
+        return ans * cft
+
+    def gammap1(self):
+        """Returns the gamma function, shifted so that it coincides with the
+        values of the factorial on the positive integers.
+        """
+        context = getcontext()
+        err = dec.Decimal(context.prec).log() / (2*support.pi()).log()
+        acc = context.prec * err.to_integral_value(rounding=dec.ROUND_CEILING)
+        context.prec *= (err * err).to_integral_value(rounding=dec.ROUND_CEILING)
+        hlf = dec.Decimal(0.5)
+        evl = dec.Decimal(1).exp()
+        # Uses Spouge approximation to calculate Pi(z), or Gamma(z + 1)
+        arz = self + acc
+        ans = arz ** (self + hlf) * (-arz).exp()
+        cfk = (acc - 1).exp()
+        cft = (2 * support.pi()).sqrt() + (cfk * ((acc - 1) ** hlf))/(self + 1)
+        j = 1
+        for k in range(2, int(acc)):
+            cfk /= -j * evl
+            try:
+                cft += (cfk * ((acc - k) ** (k - hlf))) / (self + k)
+            except DivisionByZero as exc:
+                context.prec //= 2
+                raise InvalidOperationError(
+                    'gamma function not defined at negative integers'
+                    ) from exc
+            j += 1
+        context.prec //= 2
+        return ans * cft
 
     def zeta(self):
         """Returns the result of the riemann zeta function on self."""
