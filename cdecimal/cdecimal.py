@@ -36,8 +36,12 @@ class CDecimal(object):
     __slots__ = ('_real', '_imag')
 
     def __init__(self, real='0', imag='0', context=None):
-        self.real = dec.Decimal(real, context)
-        self.imag = dec.Decimal(imag, context)
+        if isinstance(real, self.__class__):
+            self.real = dec.Decimal(real.real, context)
+            self.imag = dec.Decimal(real.imag, context)
+        else:
+            self.real = dec.Decimal(real, context)
+            self.imag = dec.Decimal(imag, context)
 
     @classmethod
     def from_string(cls, value='0+0j', context=None):
@@ -770,9 +774,9 @@ class CDecimal(object):
     def atan(self):
         """Returns the complex inverse tangent of self."""
         getcontext().prec += 2
-        im1 = self.__class__(0, 1) * self
-        arg = (1 - im1) / (1 + im1)
-        ans = self.__class__(0, 0.5) * arg.ln()
+        im1 = self.__class__(-self._imag, self._real)
+        arg = (1 - im1).ln() - (1 + im1).ln()
+        ans = self.__class__(0, 0.5) * arg
         getcontext().prec -= 2
         return +ans
 
@@ -824,8 +828,8 @@ class CDecimal(object):
     def atanh(self):
         """Returns the complex inverse hyperbolic tangent of self."""
         getcontext().prec += 2
-        arg = (1 - self) / (1 + self)
-        ans = arg.ln() / 2
+        arg = (1 + self).ln() - (1 - self).ln()
+        ans = arg / 2
         getcontext().prec -= 2
         return +ans
 
